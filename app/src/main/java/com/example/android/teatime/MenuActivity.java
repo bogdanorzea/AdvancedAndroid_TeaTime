@@ -21,6 +21,7 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.annotation.VisibleForTesting;
+import android.support.test.espresso.IdlingResource;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.View;
@@ -38,36 +39,60 @@ public class MenuActivity extends AppCompatActivity implements ImageDownloader.D
 
     public final static String EXTRA_TEA_NAME = "com.example.android.teatime.EXTRA_TEA_NAME";
 
+    // The Idling Resource which will be null in production.
     @Nullable
     private SimpleIdlingResource mIdlingResource;
 
+    /**
+     * Only called from test, creates and returns a new {@link SimpleIdlingResource}.
+     */
     @VisibleForTesting
     @NonNull
-    public SimpleIdlingResource createSimpleIdlingResource(){
+    public IdlingResource getIdlingResource() {
         if (mIdlingResource == null) {
             mIdlingResource = new SimpleIdlingResource();
         }
         return mIdlingResource;
     }
 
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_menu);
+        Toolbar menuToolbar = (Toolbar) findViewById(R.id.menu_toolbar);
+        setSupportActionBar(menuToolbar);
+        getSupportActionBar().setTitle(getString(R.string.menu_title));
+
+        // Get the IdlingResource instance
+        getIdlingResource();
+    }
 
     /**
-     * TODO (4) Using the method you created, get the IdlingResource variable.
-     * Then call downloadImage from ImageDownloader. To ensure there's enough time for IdlingResource
-     * to be initialized, remember to call downloadImage in either onStart or onResume.
-     * This is because @Before in Espresso Tests is executed after the activity is created in
-     * onCreate, so there might not be enough time to register the IdlingResource if the download is
-     * done too early.
+     * We call ImageDownloader.downloadImage from onStart or onResume instead of in onCreate
+     * to ensure there is enougth time to register IdlingResource if the download is done
+     * too early (i.e. in onCreate)
      */
+    @Override
+    protected void onStart() {
+        super.onStart();
+        ImageDownloader.downloadImage(this, MenuActivity.this, mIdlingResource);
+    }
 
+    /**
+     * When the thread in {@link ImageDownloader} is finished, it will return an ArrayList of Tea
+     * objects via the callback's onDone().
+     */
     @Override
     public void onDone(ArrayList<Tea> teas) {
+
+        //TextView testing =(TextView)findViewById(R.id.textView);
+        //testing.setText("Changed");
+
         // Create a {@link TeaAdapter}, whose data source is a list of {@link Tea}s.
         // The adapter know how to create grid items for each item in the list.
         GridView gridview = (GridView) findViewById(R.id.tea_grid_view);
         TeaMenuAdapter adapter = new TeaMenuAdapter(this, R.layout.grid_item_layout, teas);
         gridview.setAdapter(adapter);
-
 
         // Set a click listener on that View
         gridview.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -82,22 +107,5 @@ public class MenuActivity extends AppCompatActivity implements ImageDownloader.D
                 startActivity(mTeaIntent);
             }
         });
-    }
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_menu);
-        Toolbar menuToolbar = (Toolbar) findViewById(R.id.menu_toolbar);
-        setSupportActionBar(menuToolbar);
-        getSupportActionBar().setTitle(getString(R.string.menu_title));
-
-        createSimpleIdlingResource();
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        ImageDownloader.downloadImage(this, this, mIdlingResource);
     }
 }
